@@ -1,0 +1,1254 @@
+**Context:** You are an experienced Laravel devolver with extensive knowlege. Below are the code files of a Laravel LAMP app
+
+**.env**
+```
+
+APP_ENV=local
+APP_DEBUG=true
+
+CACHE_DRIVER=file
+SESSION_DRIVER=file
+QUEUE_DRIVER=sync
+
+MAIL_DRIVER=smtp
+MAIL_HOST=mailtrap.io
+MAIL_PORT=2525
+MAIL_USERNAME=null
+MAIL_PASSWORD=null
+MAIL_ENCRYPTION=null
+
+DB_CONNECTION=mysql
+DB_HOST=db
+DB_PORT=3306
+DB_DATABASE=db_7Z3KyeEMmL
+DB_USERNAME=usr_9tboPXqA18
+DB_PASSWORD=MTRnKZOVrB
+
+
+APP_KEY=base64:vSA9s5GUIJiGPhFgb6HNl1IVM9aufynjbq5sh83EfqU=
+
+```
+
+========================================
+
+**composer.json**
+```json
+{
+  "name": "pedro-consuegra/restaurant-reservation-crm",
+  "type": "project",
+  "description": "A small Laravel 12 restaurant reservation CRM with Meta Conversions API Purchase tracking.",
+  "keywords": [
+    "laravel",
+    "restaurant",
+    "reservation",
+    "crm",
+    "meta",
+    "capi"
+  ],
+  "license": "MIT",
+  "require": {
+    "php": "^8.2",
+    "laravel/framework": "^12.0",
+    "laravel/tinker": "^2.10"
+  },
+  "require-dev": {
+    "fakerphp/faker": "^1.23",
+...
+```
+
+========================================
+
+**resources/views/layouts/app.blade.php**
+```php
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    <title>@yield('title', 'Restaurant Reservation CRM')</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        :root {
+            --crm-sidebar: #172033;
+            --crm-accent: #e86f38;
+            --crm-soft: #fff7f2;
+        }
+        body {
+            background: #f6f7fb;
+            color: #263238;
+        }
+        .app-shell {
+            min-height: 100vh;
+        }
+        .sidebar {
+            background: var(--crm-sidebar);
+            color: #fff;
+            min-height: 100vh;
+            position: sticky;
+            top: 0;
+        }
+        .sidebar .brand {
+            letter-spacing: -.03em;
+            font-weight: 800;
+        }
+        .sidebar .nav-link {
+            color: rgba(255, 255, 255, .76);
+            border-radius: 14px;
+            padding: .7rem .85rem;
+        }
+        .sidebar .nav-link.active,
+        .sidebar .nav-link:hover {
+            color: #fff;
+            background: rgba(255, 255, 255, .12);
+        }
+        .topbar {
+            background: rgba(255, 255, 255, .82);
+            backdrop-filter: blur(12px);
+            border-bottom: 1px solid rgba(0, 0, 0, .05);
+        }
+        .card-soft {
+            border: 0;
+            border-radius: 22px;
+            box-shadow: 0 12px 32px rgba(15, 23, 42, .06);
+        }
+        .stat-icon {
+            width: 44px;
+            height: 44px;
+            border-radius: 15px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--crm-soft);
+            color: var(--crm-accent);
+        }
+        .btn-accent {
+            --bs-btn-bg: var(--crm-accent);
+            --bs-btn-border-color: var(--crm-accent);
+            --bs-btn-hover-bg: #d85e29;
+            --bs-btn-hover-border-color: #d85e29;
+            --bs-btn-color: #fff;
+            --bs-btn-hover-color: #fff;
+        }
+        .table > :not(caption) > * > * {
+            padding: 1rem .85rem;
+        }
+        .content-wrap {
+            max-width: 1480px;
+        }
+        @media (max-width: 991.98px) {
+            .sidebar {
+                min-height: auto;
+                position: relative;
+            }
+        }
+    </style>
+</head>
+<body>
+<div class="container-fluid app-shell">
+    <div class="row">
+        <aside class="col-lg-3 col-xl-2 sidebar p-4">
+            <div class="d-flex align-items-center gap-2 mb-4">
+                <div class="stat-icon bg-white bg-opacity-10 text-white">
+                    <i class="bi bi-calendar2-heart"></i>
+                </div>
+                <div>
+                    <div class="brand fs-5">Reservation CRM</div>
+                    <div class="small text-white-50">Restaurant growth desk</div>
+                </div>
+            </div>
+
+            <nav class="nav flex-column gap-2">
+                <a class="nav-link {{ request()->routeIs('dashboard') ? 'active' : '' }}" href="{{ route('dashboard') }}">
+                    <i class="bi bi-speedometer2 me-2"></i> Dashboard
+                </a>
+                <a class="nav-link {{ request()->routeIs('reservations.*') ? 'active' : '' }}" href="{{ route('reservations.index') }}">
+                    <i class="bi bi-journal-text me-2"></i> Reservations
+                </a>
+                <a class="nav-link" href="{{ route('reservations.create') }}">
+                    <i class="bi bi-plus-circle me-2"></i> New reservation
+                </a>
+            </nav>
+
+            <div class="mt-5 p-3 rounded-4 bg-white bg-opacity-10 small text-white-50">
+                Purchase events are sent only when a reservation is confirmed or manually retried.
+            </div>
+        </aside>
+
+        <main class="col-lg-9 col-xl-10 px-0">
+            <nav class="topbar px-4 py-3 d-flex align-items-center justify-content-between">
+                <div>
+                    <div class="fw-semibold">@yield('page_title', 'Dashboard')</div>
+                    <div class="small text-muted">Clean reservation tracking with Meta CAPI deduplication.</div>
+                </div>
+                <a href="{{ route('reservations.create') }}" class="btn btn-accent rounded-pill px-4">
+                    <i class="bi bi-plus-lg me-1"></i> Reservation
+                </a>
+            </nav>
+
+            <div class="content-wrap p-4 p-xl-5">
+                @foreach (['success' => 'success', 'warning' => 'warning', 'info' => 'info', 'error' => 'danger'] as $flashKey => $alertClass)
+                    @if (session($flashKey))
+                        <div class="alert alert-{{ $alertClass }} alert-dismissible fade show rounded-4 border-0 shadow-sm" role="alert">
+                            {{ session($flashKey) }}
+                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                        </div>
+                    @endif
+                @endforeach
+
+                @if ($errors->any())
+                    <div class="alert alert-danger rounded-4 border-0 shadow-sm">
+                        <div class="fw-semibold mb-1">Please fix the following:</div>
+                        <ul class="mb-0">
+                            @foreach ($errors->all() as $error)
+                                <li>{{ $error }}</li>
+                            @endforeach
+                        </ul>
+                    </div>
+                @endif
+
+                @yield('content')
+            </div>
+        </main>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+    document.querySelectorAll('[data-confirm]').forEach((button) => {
+        button.addEventListener('click', (event) => {
+            if (!window.confirm(button.dataset.confirm)) {
+                event.preventDefault();
+            }
+        });
+    });
+</script>
+@stack('scripts')
+</body>
+</html>
+
+```
+
+========================================
+
+**config/view.php**
+```php
+<?php
+
+return [
+
+    'paths' => [
+        resource_path('views'),
+    ],
+
+    'compiled' => env(
+        'VIEW_COMPILED_PATH',
+        realpath(storage_path('framework/views')) ?: storage_path('framework/views')
+    ),
+
+];
+```
+
+========================================
+
+**resources/views/dashboard.blade.php**
+```php
+@extends('layouts.app')
+
+@section('title', 'Dashboard | Restaurant Reservation CRM')
+@section('page_title', 'Dashboard')
+
+@section('content')
+    <div class="row g-4 mb-4">
+        <div class="col-md-6 col-xl-3">
+            <div class="card card-soft h-100">
+                <div class="card-body d-flex justify-content-between align-items-start">
+                    <div>
+                        <div class="text-muted small">Total reservations</div>
+                        <div class="display-6 fw-bold">{{ number_format($totalReservations) }}</div>
+                    </div>
+                    <span class="stat-icon"><i class="bi bi-calendar-check"></i></span>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6 col-xl-3">
+            <div class="card card-soft h-100">
+                <div class="card-body d-flex justify-content-between align-items-start">
+                    <div>
+                        <div class="text-muted small">Confirmed</div>
+                        <div class="display-6 fw-bold">{{ number_format($confirmedReservations) }}</div>
+                    </div>
+                    <span class="stat-icon"><i class="bi bi-check2-circle"></i></span>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6 col-xl-3">
+            <div class="card card-soft h-100">
+                <div class="card-body d-flex justify-content-between align-items-start">
+                    <div>
+                        <div class="text-muted small">Pending</div>
+                        <div class="display-6 fw-bold">{{ number_format($pendingReservations) }}</div>
+                    </div>
+                    <span class="stat-icon"><i class="bi bi-hourglass-split"></i></span>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6 col-xl-3">
+            <div class="card card-soft h-100">
+                <div class="card-body d-flex justify-content-between align-items-start">
+                    <div>
+                        <div class="text-muted small">Tracked purchase value</div>
+                        <div class="display-6 fw-bold">${{ number_format((float) $trackedPurchaseValue, 2) }}</div>
+                    </div>
+                    <span class="stat-icon"><i class="bi bi-cash-coin"></i></span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card card-soft">
+        <div class="card-header bg-white border-0 rounded-top-4 p-4 d-flex justify-content-between align-items-center">
+            <div>
+                <h5 class="mb-0">Recent reservations</h5>
+                <div class="small text-muted">Latest reservation and Meta event activity.</div>
+            </div>
+            <a href="{{ route('reservations.index') }}" class="btn btn-outline-secondary rounded-pill">View all</a>
+        </div>
+        <div class="table-responsive">
+            <table class="table align-middle mb-0">
+                <thead class="table-light">
+                <tr>
+                    <th>Customer</th>
+                    <th>Restaurant</th>
+                    <th>Date / Time</th>
+                    <th>Status</th>
+                    <th>Purchase</th>
+                    <th>Meta</th>
+                    <th class="text-end">Action</th>
+                </tr>
+                </thead>
+                <tbody>
+                @forelse ($recentReservations as $reservation)
+                    <tr>
+                        <td>
+                            <div class="fw-semibold">{{ $reservation->customer_name }}</div>
+                            <div class="small text-muted">{{ $reservation->email }}</div>
+                        </td>
+                        <td>{{ $reservation->restaurant_name }}</td>
+                        <td>
+                            {{ $reservation->reservation_date?->format('M j, Y') }}
+                            <div class="small text-muted">{{ $reservation->formattedReservationTime() }}</div>
+                        </td>
+                        <td><span class="badge {{ $reservation->statusBadgeClass() }}">{{ ucfirst($reservation->status) }}</span></td>
+                        <td>{{ $reservation->currency }} {{ number_format((float) $reservation->purchase_value, 2) }}</td>
+                        <td><span class="badge {{ $reservation->metaStatusBadgeClass() }}">{{ $reservation->metaStatusLabel() }}</span></td>
+                        <td class="text-end">
+                            <a href="{{ route('reservations.show', $reservation) }}" class="btn btn-sm btn-outline-primary rounded-pill">Open</a>
+                        </td>
+                    </tr>
+                @empty
+                    <tr>
+                        <td colspan="7" class="text-center text-muted py-5">No reservations yet.</td>
+                    </tr>
+                @endforelse
+                </tbody>
+            </table>
+        </div>
+    </div>
+@endsection
+
+```
+
+========================================
+
+**routes/web.php**
+```php
+<?php
+
+use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\ReservationController;
+use Illuminate\Support\Facades\Route;
+
+Route::redirect('/', '/dashboard');
+
+Route::get('/dashboard', DashboardController::class)->name('dashboard');
+
+Route::resource('reservations', ReservationController::class);
+Route::post('/reservations/{reservation}/confirm', [ReservationController::class, 'confirm'])
+    ->name('reservations.confirm');
+Route::post('/reservations/{reservation}/retry-meta-event', [ReservationController::class, 'retryMetaEvent'])
+    ->name('reservations.retry-meta-event');
+
+```
+
+========================================
+
+**app/Http/Controllers/Controller.php**
+```php
+<?php
+
+namespace App\Http\Controllers;
+
+abstract class Controller
+{
+    // Shared controller behavior can be added here if the app grows.
+}
+
+```
+
+========================================
+
+**app/Http/Controllers/DashboardController.php**
+```php
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Models\Reservation;
+use Illuminate\View\View;
+
+class DashboardController extends Controller
+{
+    public function __invoke(): View
+    {
+        return view('dashboard', [
+            'totalReservations' => Reservation::count(),
+            'confirmedReservations' => Reservation::where('status', Reservation::STATUS_CONFIRMED)->count(),
+            'pendingReservations' => Reservation::where('status', Reservation::STATUS_PENDING)->count(),
+            'trackedPurchaseValue' => Reservation::whereNotNull('meta_event_sent_at')->sum('purchase_value'),
+            'recentReservations' => Reservation::latest()->take(8)->get(),
+        ]);
+    }
+}
+
+```
+
+========================================
+
+**app/Http/Controllers/ReservationController.php**
+```php
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Models\Reservation;
+use App\Services\MetaConversionsApiService;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
+use Illuminate\View\View;
+
+class ReservationController extends Controller
+{
+    public function index(): View
+    {
+        return view('reservations.index', [
+            'reservations' => Reservation::latest()->paginate(12),
+        ]);
+    }
+
+    public function create(): View
+    {
+        return view('reservations.create', [
+            'reservation' => new Reservation([
+                'status' => Reservation::STATUS_PENDING,
+                'currency' => 'USD',
+                'purchase_value' => '0.00',
+            ]),
+        ]);
+    }
+
+    public function store(Request $request): RedirectResponse
+    {
+        $data = $this->validatedReservationData($request);
+
+        $data['client_ip_address'] = $request->ip();
+        $data['client_user_agent'] = $request->userAgent();
+        $data['fbp'] = $request->cookie('_fbp');
+        $data['fbc'] = $request->cookie('_fbc');
+
+        $reservation = Reservation::create($data);
+
+        return redirect()
+            ->route('reservations.show', $reservation)
+            ->with('success', 'Reservation created. Confirm it when you are ready to send the Meta Purchase event.');
+    }
+
+    public function show(Reservation $reservation): View
+    {
+        return view('reservations.show', compact('reservation'));
+    }
+
+    public function edit(Reservation $reservation): View
+    {
+        return view('reservations.edit', compact('reservation'));
+    }
+
+    public function update(Request $request, Reservation $reservation): RedirectResponse
+    {
+        $reservation->update($this->validatedReservationData($request));
+
+        return redirect()
+            ->route('reservations.show', $reservation)
+            ->with('success', 'Reservation updated.');
+    }
+
+    public function destroy(Reservation $reservation): RedirectResponse
+    {
+        $reservation->delete();
+
+        return redirect()
+            ->route('reservations.index')
+            ->with('success', 'Reservation deleted.');
+    }
+
+    public function confirm(
+        Request $request,
+        Reservation $reservation,
+        MetaConversionsApiService $metaConversionsApiService
+    ): RedirectResponse {
+        if ($reservation->status === Reservation::STATUS_CANCELLED) {
+            return redirect()
+                ->route('reservations.show', $reservation)
+                ->with('warning', 'Cancelled reservations cannot be confirmed. Edit the reservation first if this was a mistake.');
+        }
+
+        if (! $reservation->isConfirmed()) {
+            $reservation->update(['status' => Reservation::STATUS_CONFIRMED]);
+            $reservation->refresh();
+        }
+
+        if ($reservation->isMetaEventSent()) {
+            return redirect()
+                ->route('reservations.show', $reservation)
+                ->with('info', 'Reservation is confirmed and the Meta Purchase event was already sent.');
+        }
+
+        $sent = $metaConversionsApiService->sendPurchase($reservation, $request);
+
+        return redirect()
+            ->route('reservations.show', $reservation->fresh())
+            ->with($sent ? 'success' : 'warning', $sent
+                ? 'Reservation confirmed and Meta Purchase event sent.'
+                : 'Reservation confirmed, but the Meta Purchase event was not sent. Check the stored response.');
+    }
+
+    public function retryMetaEvent(
+        Request $request,
+        Reservation $reservation,
+        MetaConversionsApiService $metaConversionsApiService
+    ): RedirectResponse {
+        if (! $reservation->isConfirmed()) {
+            return redirect()
+                ->route('reservations.show', $reservation)
+                ->with('warning', 'Only confirmed reservations can send a Meta Purchase event.');
+        }
+
+        if (! $reservation->canRetryMetaEvent()) {
+            return redirect()
+                ->route('reservations.show', $reservation)
+                ->with('info', 'The Meta Purchase event was already sent. No duplicate event was created.');
+        }
+
+        $sent = $metaConversionsApiService->sendPurchase($reservation, $request);
+
+        return redirect()
+            ->route('reservations.show', $reservation->fresh())
+            ->with($sent ? 'success' : 'warning', $sent
+                ? 'Meta Purchase event sent.'
+                : 'Meta Purchase event retry failed. Check the stored response.');
+    }
+
+    private function validatedReservationData(Request $request): array
+    {
+        return $request->validate([
+            'customer_name' => ['required', 'string', 'max:255'],
+            'email' => ['required', 'email', 'max:255'],
+            'phone' => ['nullable', 'string', 'max:50'],
+            'reservation_date' => ['required', 'date'],
+            'reservation_time' => ['required', 'date_format:H:i'],
+            'party_size' => ['required', 'integer', 'min:1'],
+            'restaurant_name' => ['required', 'string', 'max:255'],
+            'status' => ['required', Rule::in(Reservation::STATUSES)],
+            'purchase_value' => ['required', 'numeric', 'min:0'],
+            'currency' => ['required', 'string', 'size:3'],
+            'notes' => ['nullable', 'string'],
+        ]);
+    }
+}
+
+```
+
+========================================
+
+**app/Models/Reservation.php**
+```php
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+
+class Reservation extends Model
+{
+    use HasFactory;
+
+    public const STATUS_PENDING = 'pending';
+    public const STATUS_CONFIRMED = 'confirmed';
+    public const STATUS_CANCELLED = 'cancelled';
+
+    public const STATUSES = [
+        self::STATUS_PENDING,
+        self::STATUS_CONFIRMED,
+        self::STATUS_CANCELLED,
+    ];
+
+    protected $fillable = [
+        'customer_name',
+        'email',
+        'phone',
+        'reservation_date',
+        'reservation_time',
+        'party_size',
+        'restaurant_name',
+        'status',
+        'purchase_value',
+        'currency',
+        'client_ip_address',
+        'client_user_agent',
+        'fbp',
+        'fbc',
+        'meta_event_id',
+        'meta_event_sent_at',
+        'meta_response',
+        'notes',
+    ];
+
+    protected $casts = [
+        'reservation_date' => 'date',
+        'meta_response' => 'array',
+        'meta_event_sent_at' => 'datetime',
+        'purchase_value' => 'decimal:2',
+    ];
+
+    public function setCurrencyAttribute(?string $value): void
+    {
+        $this->attributes['currency'] = strtoupper(trim($value ?: 'USD'));
+    }
+
+    public function isConfirmed(): bool
+    {
+        return $this->status === self::STATUS_CONFIRMED;
+    }
+
+    public function isMetaEventSent(): bool
+    {
+        return $this->meta_event_sent_at !== null;
+    }
+
+    public function hasMetaEventFailed(): bool
+    {
+        return $this->meta_response !== null
+            && data_get($this->meta_response, 'ok') === false
+            && $this->meta_event_sent_at === null;
+    }
+
+    public function canRetryMetaEvent(): bool
+    {
+        return $this->isConfirmed()
+            && ($this->meta_event_sent_at === null || $this->hasMetaEventFailed());
+    }
+
+    public function metaStatusLabel(): string
+    {
+        if ($this->isMetaEventSent()) {
+            return 'Sent';
+        }
+
+        if ($this->hasMetaEventFailed()) {
+            return 'Failed';
+        }
+
+        return 'Not Sent';
+    }
+
+    public function metaStatusBadgeClass(): string
+    {
+        return match ($this->metaStatusLabel()) {
+            'Sent' => 'text-bg-success',
+            'Failed' => 'text-bg-danger',
+            default => 'text-bg-secondary',
+        };
+    }
+
+    public function statusBadgeClass(): string
+    {
+        return match ($this->status) {
+            self::STATUS_CONFIRMED => 'text-bg-success',
+            self::STATUS_CANCELLED => 'text-bg-danger',
+            default => 'text-bg-warning',
+        };
+    }
+
+    public function formattedReservationTime(): string
+    {
+        return substr((string) $this->reservation_time, 0, 5);
+    }
+}
+
+```
+
+========================================
+
+**app/Models/User.php**
+```php
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Foundation\Auth\User as Authenticatable;
+use Illuminate\Notifications\Notifiable;
+
+class User extends Authenticatable
+{
+    use HasFactory, Notifiable;
+
+    protected $fillable = [
+        'name',
+        'email',
+        'password',
+    ];
+
+    protected $hidden = [
+        'password',
+        'remember_token',
+    ];
+
+    protected function casts(): array
+    {
+        return [
+            'email_verified_at' => 'datetime',
+            'password' => 'hashed',
+        ];
+    }
+}
+
+```
+
+========================================
+
+**app/Providers/AppServiceProvider.php**
+```php
+<?php
+
+namespace App\Providers;
+
+use Illuminate\Support\ServiceProvider;
+
+class AppServiceProvider extends ServiceProvider
+{
+    public function register(): void
+    {
+        //
+    }
+
+    public function boot(): void
+    {
+        //
+    }
+}
+
+```
+
+========================================
+
+**app/Services/MetaConversionsApiService.php**
+```php
+<?php
+
+namespace App\Services;
+
+use App\Models\Reservation;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
+use Throwable;
+
+class MetaConversionsApiService
+{
+    /**
+     * Send a Meta Conversions API Purchase event for a confirmed reservation.
+     *
+     * Customer fields hashed before sending:
+     * - email is trimmed, lowercased, and SHA-256 hashed
+     * - phone is reduced to digits and SHA-256 hashed
+     *
+     * Browser and request fields are not hashed:
+     * - client_ip_address
+     * - client_user_agent
+     * - fbp
+     * - fbc
+     *
+     * The event is POSTed to:
+     * https://graph.facebook.com/{META_GRAPH_API_VERSION}/{META_PIXEL_ID}/events
+     *
+     * To test in Meta Events Manager, set META_TEST_EVENT_CODE in .env.
+     * This service includes test_event_code only when that value exists.
+     */
+    public function sendPurchase(Reservation $reservation, Request $request): bool
+    {
+        if ($reservation->isMetaEventSent()) {
+            Log::info('Meta CAPI Purchase event was not sent because it already succeeded.', [
+                'reservation_id' => $reservation->id,
+                'event_id' => $reservation->meta_event_id,
+            ]);
+
+            return true;
+        }
+
+        $eventId = $reservation->meta_event_id ?: $this->generateEventId($reservation);
+
+        if (! $reservation->meta_event_id) {
+            $reservation->forceFill(['meta_event_id' => $eventId])->save();
+        }
+
+        $pixelId = config('services.meta.pixel_id');
+        $accessToken = config('services.meta.access_token');
+        $graphApiVersion = config('services.meta.graph_api_version');
+        $testEventCode = config('services.meta.test_event_code');
+
+        if (! $pixelId || ! $accessToken || ! $graphApiVersion || $graphApiVersion === 'vXX.X') {
+            return $this->storeFailure($reservation, 'Meta CAPI is missing a valid META_PIXEL_ID, META_ACCESS_TOKEN, or META_GRAPH_API_VERSION.');
+        }
+
+        $payload = $this->buildPayload($reservation, $request, $eventId);
+
+        if ($testEventCode) {
+            $payload['test_event_code'] = $testEventCode;
+        }
+
+        $endpoint = sprintf(
+            'https://graph.facebook.com/%s/%s/events?%s',
+            trim($graphApiVersion, '/'),
+            urlencode((string) $pixelId),
+            http_build_query(['access_token' => $accessToken])
+        );
+
+        try {
+            $response = Http::timeout(12)
+                ->acceptJson()
+                ->asJson()
+                ->post($endpoint, $payload);
+
+            $storedResponse = [
+                'ok' => $response->successful(),
+                'status' => $response->status(),
+                'body' => $response->json() ?: $response->body(),
+            ];
+
+            if ($response->successful()) {
+                $reservation->forceFill([
+                    'meta_event_sent_at' => now(),
+                    'meta_response' => $storedResponse,
+                ])->save();
+
+                Log::info('Meta CAPI Purchase event sent.', [
+                    'reservation_id' => $reservation->id,
+                    'event_id' => $eventId,
+                    'status' => $response->status(),
+                ]);
+
+                return true;
+            }
+
+            $reservation->forceFill([
+                'meta_response' => $storedResponse,
+            ])->save();
+
+            Log::warning('Meta CAPI Purchase event failed.', [
+                'reservation_id' => $reservation->id,
+                'event_id' => $eventId,
+                'status' => $response->status(),
+            ]);
+
+            return false;
+        } catch (Throwable $exception) {
+            return $this->storeFailure($reservation, $exception->getMessage());
+        }
+    }
+
+    private function buildPayload(Reservation $reservation, Request $request, string $eventId): array
+    {
+        $hashedEmail = $this->hashEmail($reservation->email);
+        $hashedPhone = $this->hashPhone($reservation->phone);
+
+        $userData = array_filter([
+            'em' => $hashedEmail ? [$hashedEmail] : null,
+            'ph' => $hashedPhone ? [$hashedPhone] : null,
+            'client_ip_address' => $reservation->client_ip_address ?: $request->ip(),
+            'client_user_agent' => $reservation->client_user_agent ?: $request->userAgent(),
+            'fbp' => $reservation->fbp ?: $request->cookie('_fbp'),
+            'fbc' => $reservation->fbc ?: $request->cookie('_fbc'),
+        ], fn ($value) => filled($value));
+
+        return [
+            'data' => [
+                [
+                    'event_name' => 'Purchase',
+                    'event_time' => now()->timestamp,
+                    'event_id' => $eventId,
+                    'action_source' => 'website',
+                    'event_source_url' => route('reservations.show', $reservation),
+                    'user_data' => $userData,
+                    'custom_data' => [
+                        'currency' => strtoupper($reservation->currency ?: 'USD'),
+                        'value' => (float) $reservation->purchase_value,
+                        'content_name' => 'Restaurant Reservation',
+                        'content_type' => 'reservation',
+                    ],
+                ],
+            ],
+        ];
+    }
+
+    private function generateEventId(Reservation $reservation): string
+    {
+        return sprintf('reservation_purchase_%s_%s', $reservation->id, (string) Str::uuid());
+    }
+
+    private function hashEmail(?string $email): ?string
+    {
+        $normalized = strtolower(trim((string) $email));
+
+        return $normalized === '' ? null : hash('sha256', $normalized);
+    }
+
+    private function hashPhone(?string $phone): ?string
+    {
+        $normalized = preg_replace('/\D+/', '', (string) $phone);
+
+        return $normalized === '' ? null : hash('sha256', $normalized);
+    }
+
+    private function storeFailure(Reservation $reservation, string $message): bool
+    {
+        $reservation->forceFill([
+            'meta_response' => [
+                'ok' => false,
+                'status' => null,
+                'body' => null,
+                'error' => $message,
+            ],
+        ])->save();
+
+        Log::warning('Meta CAPI Purchase event failed before receiving a response.', [
+            'reservation_id' => $reservation->id,
+            'event_id' => $reservation->meta_event_id,
+            'error' => $message,
+        ]);
+
+        return false;
+    }
+}
+
+```
+
+========================================
+
+**bootstrap/cache/services.php**
+```php
+<?php return array (
+  'providers' => 
+  array (
+    0 => 'Illuminate\\Auth\\AuthServiceProvider',
+    1 => 'Illuminate\\Broadcasting\\BroadcastServiceProvider',
+    2 => 'Illuminate\\Bus\\BusServiceProvider',
+    3 => 'Illuminate\\Cache\\CacheServiceProvider',
+    4 => 'Illuminate\\Foundation\\Providers\\ConsoleSupportServiceProvider',
+    5 => 'Illuminate\\Concurrency\\ConcurrencyServiceProvider',
+    6 => 'Illuminate\\Cookie\\CookieServiceProvider',
+    7 => 'Illuminate\\Database\\DatabaseServiceProvider',
+    8 => 'Illuminate\\Encryption\\EncryptionServiceProvider',
+    9 => 'Illuminate\\Filesystem\\FilesystemServiceProvider',
+    10 => 'Illuminate\\Foundation\\Providers\\FoundationServiceProvider',
+    11 => 'Illuminate\\Hashing\\HashServiceProvider',
+    12 => 'Illuminate\\Mail\\MailServiceProvider',
+    13 => 'Illuminate\\Notifications\\NotificationServiceProvider',
+    14 => 'Illuminate\\Pagination\\PaginationServiceProvider',
+    15 => 'Illuminate\\Auth\\Passwords\\PasswordResetServiceProvider',
+    16 => 'Illuminate\\Pipeline\\PipelineServiceProvider',
+    17 => 'Illuminate\\Queue\\QueueServiceProvider',
+    18 => 'Illuminate\\Redis\\RedisServiceProvider',
+    19 => 'Illuminate\\Session\\SessionServiceProvider',
+    20 => 'Illuminate\\Translation\\TranslationServiceProvider',
+    21 => 'Illuminate\\Validation\\ValidationServiceProvider',
+    22 => 'Illuminate\\View\\ViewServiceProvider',
+    23 => 'Laravel\\Tinker\\TinkerServiceProvider',
+    24 => 'Carbon\\Laravel\\ServiceProvider',
+    25 => 'NunoMaduro\\Collision\\Adapters\\Laravel\\CollisionServiceProvider',
+    26 => 'Termwind\\Laravel\\TermwindServiceProvider',
+    27 => 'App\\Providers\\AppServiceProvider',
+  ),
+  'eager' => 
+  array (
+    0 => 'Illuminate\\Auth\\AuthServiceProvider',
+    1 => 'Illuminate\\Cookie\\CookieServiceProvider',
+    2 => 'Illuminate\\Database\\DatabaseServiceProvider',
+    3 => 'Illuminate\\Encryption\\EncryptionServiceProvider',
+    4 => 'Illuminate\\Filesystem\\FilesystemServiceProvider',
+    5 => 'Illuminate\\Foundation\\Providers\\FoundationServiceProvider',
+    6 => 'Illuminate\\Notifications\\NotificationServiceProvider',
+    7 => 'Illuminate\\Pagination\\PaginationServiceProvider',
+    8 => 'Illuminate\\Session\\SessionServiceProvider',
+    9 => 'Illuminate\\View\\ViewServiceProvider',
+    10 => 'Carbon\\Laravel\\ServiceProvider',
+    11 => 'NunoMaduro\\Collision\\Adapters\\Laravel\\CollisionServiceProvider',
+    12 => 'Termwind\\Laravel\\TermwindServiceProvider',
+    13 => 'App\\Providers\\AppServiceProvider',
+  ),
+  'deferred' => 
+  array (
+    'Illuminate\\Broadcasting\\BroadcastManager' => 'Illuminate\\Broadcasting\\BroadcastServiceProvider',
+    'Illuminate\\Contracts\\Broadcasting\\Factory' => 'Illuminate\\Broadcasting\\BroadcastServiceProvider',
+    'Illuminate\\Contracts\\Broadcasting\\Broadcaster' => 'Illuminate\\Broadcasting\\BroadcastServiceProvider',
+    'Illuminate\\Bus\\Dispatcher' => 'Illuminate\\Bus\\BusServiceProvider',
+    'Illuminate\\Contracts\\Bus\\Dispatcher' => 'Illuminate\\Bus\\BusServiceProvider',
+    'Illuminate\\Contracts\\Bus\\QueueingDispatcher' => 'Illuminate\\Bus\\BusServiceProvider',
+    'Illuminate\\Bus\\BatchRepository' => 'Illuminate\\Bus\\BusServiceProvider',
+    'Illuminate\\Bus\\DatabaseBatchRepository' => 'Illuminate\\Bus\\BusServiceProvider',
+    'cache' => 'Illuminate\\Cache\\CacheServiceProvider',
+    'cache.store' => 'Illuminate\\Cache\\CacheServiceProvider',
+    'cache.psr6' => 'Illuminate\\Cache\\CacheServiceProvider',
+    'memcached.connector' => 'Illuminate\\Cache\\CacheServiceProvider',
+    'Illuminate\\Cache\\RateLimiter' => 'Illuminate\\Cache\\CacheServiceProvider',
+    'Illuminate\\Foundation\\Console\\AboutCommand' => 'Illuminate\\Foundation\\Providers\\ConsoleSupportServiceProvider',
+    'Illuminate\\Cache\\Console\\ClearCommand' => 'Illuminate\\Foundation\\Providers\\ConsoleSupportServiceProvider',
+    'Illuminate\\Cache\\Console\\ForgetCommand' => 'Illuminate\\Foundation\\Providers\\ConsoleSupportServiceProvider',
+    'Illuminate\\Foundation\\Console\\ClearCompiledCommand' => 'Illuminate\\Foundation\\Providers\\ConsoleSupportServiceProvider',
+    'Illuminate\\Auth\\Console\\ClearResetsCommand' => 'Illuminate\\Foundation\\Providers\\ConsoleSupportServiceProvider',
+    'Illuminate\\Foundation\\Console\\ConfigCacheCommand' => 'Illuminate\\Foundation\\Providers\\ConsoleSupportServiceProvider',
+    'Illuminate\\Foundation\\Console\\ConfigClearCommand' => 'Illuminate\\Foundation\\Providers\\ConsoleSupportServiceProvider',
+    'Illuminate\\Foundation\\Console\\ConfigShowCommand' => 'Illuminate\\Foundation\\Providers\\ConsoleSupportServiceProvider',
+    'Illuminate\\Database\\Console\\DbCommand' => 'Illuminate\\Foundation\\Providers\\ConsoleSupportServiceProvider',
+    'Illuminate\\Database\\Console\\MonitorCommand' => 'Illuminate\\Foundation\\Providers\\ConsoleSupportServiceProvider',
+    'Illuminate\\Database\\Console\\PruneCommand' => 'Illuminate\\Foundation\\Providers\\ConsoleSupportServiceProvider',
+    'Illuminate\\Database\\Console\\ShowCommand' => 'Illuminate\\Foundation\\Providers\\ConsoleSupportServiceProvider',
+    'Illuminate\\Database\\Console\\TableCommand' => 'Illuminate\\Foundation\\Providers\\ConsoleSupportServiceProvider',
+    'Illuminate\\Database\\Console\\WipeCommand' => 'Illuminate\\Foundation\\Providers\\ConsoleSupportServiceProvider',
+    'Illuminate\\Foundation\\Console\\DownCommand' => 'Illuminate\\Foundation\\Providers\\ConsoleSupportServiceProvider',
+    'Illuminate\\Foundation\\Console\\EnvironmentCommand' => 'Illuminate\\Foundation\\Providers\\ConsoleSupportServiceProvider',
+    'Illuminate\\Foundation\\Console\\EnvironmentDecryptCommand' => 'Illuminate\\Foundation\\Providers\\ConsoleSupportServiceProvider',
+    'Illuminate\\Foundation\\Console\\EnvironmentEncryptCommand' => 'Illuminate\\Foundation\\Providers\\ConsoleSupportServiceProvider',
+    'Illuminate\\Foundation\\Console\\EventCacheCommand' => 'Illuminate\\Foundation\\Providers\\ConsoleSupportServiceProvider',
+    'Illuminate\\Foundation\\Console\\EventClearCommand' => 'Illuminate\\Foundation\\Providers\\ConsoleSupportServiceProvider',
+    'Illuminate\\Foundation\\Console\\EventListCommand' => 'Illuminate\\Foundation\\Providers\\ConsoleSupportServiceProvider',
+    'Illuminate\\Concurrency\\Console\\InvokeSerializedClosureCommand' => 'Illuminate\\Foundation\\Providers\\ConsoleSupportServiceProvider',
+    'Illuminate\\Foundation\\Console\\KeyGenerateCommand' => 'Illuminate\\Foundation\\Providers\\ConsoleSupportServiceProvider',
+    'Illuminate\\Foundation\\Console\\OptimizeCommand' => 'Illuminate\\Foundation\\Providers\\ConsoleSupportServiceProvider',
+    'Illuminate\\Foundation\\Console\\OptimizeClearCommand' => 'Illuminate\\Foundation\\Providers\\ConsoleSupportServiceProvider',
+    'Illuminate\\Foundation\\Console\\PackageDiscoverCommand' => 'Illuminate\\Foundation\\Providers\\ConsoleSupportServiceProvider',
+    'Illuminate\\Cache\\Console\\PruneStaleTagsCommand' => 'Illuminate\\Foundation\\Providers\\ConsoleSupportServiceProvider',
+    'Illuminate\\Queue\\Console\\ClearCommand' => 'Illuminate\\Foundation\\Providers\\ConsoleSupportServiceProvider',
+    'Illuminate\\Queue\\Console\\ListFailedCommand' => 'Illuminate\\Foundation\\Providers\\ConsoleSupportServiceProvider',
+    'Illuminate\\Queue\\Console\\FlushFailedCommand' => 'Illuminate\\Foundation\\Providers\\ConsoleSupportServiceProvider',
+    'Illuminate\\Queue\\Console\\ForgetFailedCommand' => 'Illuminate\\Foundation\\Providers\\ConsoleSupportServiceProvider',
+    'Illuminate\\Queue\\Console\\ListenCommand' => 'Illuminate\\Foundation\\Providers\\ConsoleSupportServiceProvider',
+    'Illuminate\\Queue\\Console\\MonitorCommand' => 'Illuminate\\Foundation\\Providers\\ConsoleSupportServiceProvider',
+    'Illuminate\\Queue\\Console\\PauseCommand' => 'Illuminate\\Foundation\\Providers\\ConsoleSupportServiceProvider',
+    'Illuminate\\Queue\\Console\\PruneBatchesCommand' => 'Illuminate\\Foundation\\Providers\\ConsoleSupportServiceProvider',
+    'Illuminate\\Queue\\Console\\PruneFailedJobsCommand' => 'Illuminate\\Foundation\\Providers\\ConsoleSupportServiceProvider',
+    'Illuminate\\Queue\\Console\\RestartCommand' => 'Illuminate\\Foundation\\Providers\\ConsoleSupportServiceProvider',
+    'Illuminate\\Queue\\Console\\ResumeCommand' => 'Illuminate\\Foundation\\Providers\\ConsoleSupportServiceProvider',
+    'Illuminate\\Queue\\Console\\RetryCommand' => 'Illuminate\\Foundation\\Providers\\ConsoleSupportServiceProvider',
+    'Illuminate\\Queue\\Console\\RetryBatchCommand' => 'Illuminate\\Foundation\\Providers\\ConsoleSupportServiceProvider',
+    'Illuminate\\Queue\\Console\\WorkCommand' => 'Illuminate\\Foundation\\Providers\\ConsoleSupportServiceProvider',
+    'Illuminate\\Foundation\\Console\\ReloadCommand' => 'Illuminate\\Foundation\\Providers\\ConsoleSupportServiceProvider',
+    'Illuminate\\Foundation\\Console\\RouteCacheCommand' => 'Illuminate\\Foundation\\Providers\\ConsoleSupportServiceProvider',
+    'Illuminate\\Foundation\\Console\\RouteClearCommand' => 'Illuminate\\Foundation\\Providers\\ConsoleSupportServiceProvider',
+    'Illuminate\\Foundation\\Console\\RouteListCommand' => 'Illuminate\\Foundation\\Providers\\ConsoleSupportServiceProvider',
+    'Illuminate\\Database\\Console\\DumpCommand' => 'Illuminate\\Foundation\\Providers\\ConsoleSupportServiceProvider',
+    'Illuminate\\Database\\Console\\Seeds\\SeedCommand' => 'Illuminate\\Foundation\\Providers\\ConsoleSupportServiceProvider',
+    'Illuminate\\Console\\Scheduling\\ScheduleFinishCommand' => 'Illuminate\\Foundation\\Providers\\ConsoleSupportServiceProvider',
+    'Illuminate\\Console\\Scheduling\\ScheduleListCommand' => 'Illuminate\\Foundation\\Providers\\ConsoleSupportServiceProvider',
+    'Illuminate\\Console\\Scheduling\\ScheduleRunCommand' => 'Illuminate\\Foundation\\Providers\\ConsoleSupportServiceProvider',
+    'Illuminate\\Console\\Scheduling\\ScheduleClearCacheCommand' => 'Illuminate\\Foundation\\Providers\\ConsoleSupportServiceProvider',
+    'Illuminate\\Console\\Scheduling\\ScheduleTestCommand' => 'Illuminate\\Foundation\\Providers\\ConsoleSupportServiceProvider',
+    'Illuminate\\Console\\Scheduling\\ScheduleWorkCommand' => 'Illuminate\\Foundation\\Providers\\ConsoleSupportServiceProvider',
+    'Illuminate\\Console\\Scheduling\\ScheduleInterruptCommand' => 'Illuminate\\Foundation\\Providers\\ConsoleSupportServiceProvider',
+    'Illuminate\\Database\\Console\\ShowModelCommand' => 'Illuminate\\Foundation\\Providers\\ConsoleSupportServiceProvider',
+    'Illuminate\\Foundation\\Console\\StorageLinkCommand' => 'Illuminate\\Foundation\\Providers\\ConsoleSupportServiceProvider',
+    'Illuminate\\Foundation\\Console\\StorageUnlinkCommand' => 'Illuminate\\Foundation\\Providers\\ConsoleSupportServiceProvider',
+    'Illuminate\\Foundation\\Console\\UpCommand' => 'Illuminate\\Foundation\\Providers\\ConsoleSupportServiceProvider',
+    'Illuminate\\Foundation\\Console\\ViewCacheCommand' => 'Illuminate\\Foundation\\Providers\\ConsoleSupportServiceProvider',
+    'Illuminate\\Foundation\\Console\\ViewClearCommand' => 'Illuminate\\Foundation\\Providers\\ConsoleSupportServiceProvider',
+    'Illuminate\\Foundation\\Console\\ApiInstallCommand' => 'Illuminate\\Foundation\\Providers\\ConsoleSupportServiceProvider',
+    'Illuminate\\Foundation\\Console\\BroadcastingInstallCommand' => 'Illuminate\\Foundation\\Providers\\ConsoleSupportServiceProvider',
+    'Illuminate\\Cache\\Console\\CacheTableCommand' => 'Illuminate\\Foundation\\Providers\\ConsoleSupportServiceProvider',
+    'Illuminate\\Foundation\\Console\\CastMakeCommand' => 'Illuminate\\Foundation\\Providers\\ConsoleSupportServiceProvider',
+    'Illuminate\\Foundation\\Console\\ChannelListCommand' => 'Illuminate\\Foundation\\Providers\\ConsoleSupportServiceProvider',
+    'Illuminate\\Foundation\\Console\\ChannelMakeCommand' => 'Illuminate\\Foundation\\Providers\\ConsoleSupportServiceProvider',
+    'Illuminate\\Foundation\\Console\\ClassMakeCommand' => 'Illuminate\\Foundation\\Providers\\ConsoleSupportServiceProvider',
+    'Illuminate\\Foundation\\Console\\ComponentMakeCommand' => 'Illuminate\\Foundation\\Providers\\ConsoleSupportServiceProvider',
+    'Illuminate\\Foundation\\Console\\ConfigMakeCommand' => 'Illuminate\\Foundation\\Providers\\ConsoleSupportServiceProvider',
+    'Illuminate\\Foundation\\Console\\ConfigPublishCommand' => 'Illuminate\\Foundation\\Providers\\ConsoleSupportServiceProvider',
+    'Illuminate\\Foundation\\Console\\ConsoleMakeCommand' => 'Illuminate\\Foundation\\Providers\\ConsoleSupportServiceProvider',
+    'Illuminate\\Routing\\Console\\ControllerMakeCommand' => 'Illuminate\\Foundation\\Providers\\ConsoleSupportServiceProvider',
+    'Illuminate\\Foundation\\Console\\DocsCommand' => 'Illuminate\\Foundation\\Providers\\ConsoleSupportServiceProvider',
+    'Illuminate\\Foundation\\Console\\EnumMakeCommand' => 'Illuminate\\Foundation\\Providers\\ConsoleSupportServiceProvider',
+    'Illuminate\\Foundation\\Console\\EventGenerateCommand' => 'Illuminate\\Foundation\\Providers\\ConsoleSupportServiceProvider',
+    'Illuminate\\Foundation\\Console\\EventMakeCommand' => 'Illuminate\\Foundation\\Providers\\ConsoleSupportServiceProvider',
+    'Illuminate\\Foundation\\Console\\ExceptionMakeCommand' => 'Illuminate\\Foundation\\Providers\\ConsoleSupportServiceProvider',
+    'Illuminate\\Database\\Console\\Factories\\FactoryMakeCommand' => 'Illuminate\\Foundation\\Providers\\ConsoleSupportServiceProvider',
+    'Illuminate\\Foundation\\Console\\InterfaceMakeCommand' => 'Illuminate\\Foundation\\Providers\\ConsoleSupportServiceProvider',
+    'Illuminate\\Foundation\\Console\\JobMakeCommand' => 'Illuminate\\Foundation\\Providers\\ConsoleSupportServiceProvider',
+    'Illuminate\\Foundation\\Console\\JobMiddlewareMakeCommand' => 'Illuminate\\Foundation\\Providers\\ConsoleSupportServiceProvider',
+    'Illuminate\\Foundation\\Console\\LangPublishCommand' => 'Illuminate\\Foundation\\Providers\\ConsoleSupportServiceProvider',
+    'Illuminate\\Foundation\\Console\\ListenerMakeCommand' => 'Illuminate\\Foundation\\Providers\\ConsoleSupportServiceProvider',
+    'Illuminate\\Foundation\\Console\\MailMakeCommand' => 'Illuminate\\Foundation\\Providers\\ConsoleSupportServiceProvider',
+    'Illuminate\\Routing\\Console\\MiddlewareMakeCommand' => 'Illuminate\\Foundation\\Providers\\ConsoleSupportServiceProvider',
+    'Illuminate\\Foundation\\Console\\ModelMakeCommand' => 'Illuminate\\Foundation\\Providers\\ConsoleSupportServiceProvider',
+    'Illuminate\\Foundation\\Console\\NotificationMakeCommand' => 'Illuminate\\Foundation\\Providers\\ConsoleSupportServiceProvider',
+    'Illuminate\\Notifications\\Console\\NotificationTableCommand' => 'Illuminate\\Foundation\\Providers\\ConsoleSupportServiceProvider',
+    'Illuminate\\Foundation\\Console\\ObserverMakeCommand' => 'Illuminate\\Foundation\\Providers\\ConsoleSupportServiceProvider',
+    'Illuminate\\Foundation\\Console\\PolicyMakeCommand' => 'Illuminate\\Foundation\\Providers\\ConsoleSupportServiceProvider',
+    'Illuminate\\Foundation\\Console\\ProviderMakeCommand' => 'Illuminate\\Foundation\\Providers\\ConsoleSupportServiceProvider',
+    'Illuminate\\Queue\\Console\\FailedTableCommand' => 'Illuminate\\Foundation\\Providers\\ConsoleSupportServiceProvider',
+    'Illuminate\\Queue\\Console\\TableCommand' => 'Illuminate\\Foundation\\Providers\\ConsoleSupportServiceProvider',
+    'Illuminate\\Queue\\Console\\BatchesTableCommand' => 'Illuminate\\Foundation\\Providers\\ConsoleSupportServiceProvider',
+    'Illuminate\\Foundation\\Console\\RequestMakeCommand' => 'Illuminate\\Foundation\\Providers\\ConsoleSupportServiceProvider',
+    'Illuminate\\Foundation\\Console\\ResourceMakeCommand' => 'Illuminate\\Foundation\\Providers\\ConsoleSupportServiceProvider',
+    'Illuminate\\Foundation\\Console\\RuleMakeCommand' => 'Illuminate\\Foundation\\Providers\\ConsoleSupportServiceProvider',
+    'Illuminate\\Foundation\\Console\\ScopeMakeCommand' => 'Illuminate\\Foundation\\Providers\\ConsoleSupportServiceProvider',
+    'Illuminate\\Database\\Console\\Seeds\\SeederMakeCommand' => 'Illuminate\\Foundation\\Providers\\ConsoleSupportServiceProvider',
+    'Illuminate\\Session\\Console\\SessionTableCommand' => 'Illuminate\\Foundation\\Providers\\ConsoleSupportServiceProvider',
+    'Illuminate\\Foundation\\Console\\ServeCommand' => 'Illuminate\\Foundation\\Providers\\ConsoleSupportServiceProvider',
+    'Illuminate\\Foundation\\Console\\StubPublishCommand' => 'Illuminate\\Foundation\\Providers\\ConsoleSupportServiceProvider',
+    'Illuminate\\Foundation\\Console\\TestMakeCommand' => 'Illuminate\\Foundation\\Providers\\ConsoleSupportServiceProvider',
+    'Illuminate\\Foundation\\Console\\TraitMakeCommand' => 'Illuminate\\Foundation\\Providers\\ConsoleSupportServiceProvider',
+    'Illuminate\\Foundation\\Console\\VendorPublishCommand' => 'Illuminate\\Foundation\\Providers\\ConsoleSupportServiceProvider',
+    'Illuminate\\Foundation\\Console\\ViewMakeCommand' => 'Illuminate\\Foundation\\Providers\\ConsoleSupportServiceProvider',
+    'migrator' => 'Illuminate\\Foundation\\Providers\\ConsoleSupportServiceProvider',
+    'migration.repository' => 'Illuminate\\Foundation\\Providers\\ConsoleSupportServiceProvider',
+    'migration.creator' => 'Illuminate\\Foundation\\Providers\\ConsoleSupportServiceProvider',
+    'Illuminate\\Database\\Migrations\\Migrator' => 'Illuminate\\Foundation\\Providers\\ConsoleSupportServiceProvider',
+    'Illuminate\\Database\\Console\\Migrations\\MigrateCommand' => 'Illuminate\\Foundation\\Providers\\ConsoleSupportServiceProvider',
+    'Illuminate\\Database\\Console\\Migrations\\FreshCommand' => 'Illuminate\\Foundation\\Providers\\ConsoleSupportServiceProvider',
+    'Illuminate\\Database\\Console\\Migrations\\InstallCommand' => 'Illuminate\\Foundation\\Providers\\ConsoleSupportServiceProvider',
+    'Illuminate\\Database\\Console\\Migrations\\RefreshCommand' => 'Illuminate\\Foundation\\Providers\\ConsoleSupportServiceProvider',
+    'Illuminate\\Database\\Console\\Migrations\\ResetCommand' => 'Illuminate\\Foundation\\Providers\\ConsoleSupportServiceProvider',
+    'Illuminate\\Database\\Console\\Migrations\\RollbackCommand' => 'Illuminate\\Foundation\\Providers\\ConsoleSupportServiceProvider',
+    'Illuminate\\Database\\Console\\Migrations\\StatusCommand' => 'Illuminate\\Foundation\\Providers\\ConsoleSupportServiceProvider',
+    'Illuminate\\Database\\Console\\Migrations\\MigrateMakeCommand' => 'Illuminate\\Foundation\\Providers\\ConsoleSupportServiceProvider',
+    'composer' => 'Illuminate\\Foundation\\Providers\\ConsoleSupportServiceProvider',
+    'Illuminate\\Concurrency\\ConcurrencyManager' => 'Illuminate\\Concurrency\\ConcurrencyServiceProvider',
+    'hash' => 'Illuminate\\Hashing\\HashServiceProvider',
+    'hash.driver' => 'Illuminate\\Hashing\\HashServiceProvider',
+    'mail.manager' => 'Illuminate\\Mail\\MailServiceProvider',
+    'mailer' => 'Illuminate\\Mail\\MailServiceProvider',
+    'Illuminate\\Mail\\Markdown' => 'Illuminate\\Mail\\MailServiceProvider',
+    'auth.password' => 'Illuminate\\Auth\\Passwords\\PasswordResetServiceProvider',
+    'auth.password.broker' => 'Illuminate\\Auth\\Passwords\\PasswordResetServiceProvider',
+    'Illuminate\\Contracts\\Pipeline\\Hub' => 'Illuminate\\Pipeline\\PipelineServiceProvider',
+    'pipeline' => 'Illuminate\\Pipeline\\PipelineServiceProvider',
+    'queue' => 'Illuminate\\Queue\\QueueServiceProvider',
+    'queue.connection' => 'Illuminate\\Queue\\QueueServiceProvider',
+    'queue.failer' => 'Illuminate\\Queue\\QueueServiceProvider',
+    'queue.listener' => 'Illuminate\\Queue\\QueueServiceProvider',
+    'queue.worker' => 'Illuminate\\Queue\\QueueServiceProvider',
+    'redis' => 'Illuminate\\Redis\\RedisServiceProvider',
+    'redis.connection' => 'Illuminate\\Redis\\RedisServiceProvider',
+    'translator' => 'Illuminate\\Translation\\TranslationServiceProvider',
+    'translation.loader' => 'Illuminate\\Translation\\TranslationServiceProvider',
+    'validator' => 'Illuminate\\Validation\\ValidationServiceProvider',
+    'validation.presence' => 'Illuminate\\Validation\\ValidationServiceProvider',
+    'Illuminate\\Contracts\\Validation\\UncompromisedVerifier' => 'Illuminate\\Validation\\ValidationServiceProvider',
+    'command.tinker' => 'Laravel\\Tinker\\TinkerServiceProvider',
+  ),
+  'when' => 
+  array (
+    'Illuminate\\Broadcasting\\BroadcastServiceProvider' => 
+    array (
+    ),
+    'Illuminate\\Bus\\BusServiceProvider' => 
+    array (
+    ),
+    'Illuminate\\Cache\\CacheServiceProvider' => 
+    array (
+    ),
+    'Illuminate\\Foundation\\Providers\\ConsoleSupportServiceProvider' => 
+    array (
+    ),
+    'Illuminate\\Concurrency\\ConcurrencyServiceProvider' => 
+    array (
+    ),
+    'Illuminate\\Hashing\\HashServiceProvider' => 
+    array (
+    ),
+    'Illuminate\\Mail\\MailServiceProvider' => 
+    array (
+    ),
+    'Illuminate\\Auth\\Passwords\\PasswordResetServiceProvider' => 
+    array (
+    ),
+    'Illuminate\\Pipeline\\PipelineServiceProvider' => 
+    array (
+    ),
+    'Illuminate\\Queue\\QueueServiceProvider' => 
+    array (
+    ),
+    'Illuminate\\Redis\\RedisServiceProvider' => 
+    array (
+    ),
+    'Illuminate\\Translation\\TranslationServiceProvider' => 
+    array (
+    ),
+    'Illuminate\\Validation\\ValidationServiceProvider' => 
+    array (
+    ),
+    'Laravel\\Tinker\\TinkerServiceProvider' => 
+    array (
+    ),
+  ),
+);
+```
+
+========================================
+
+**bootstrap/cache/packages.php**
+```php
+<?php return array (
+  'laravel/tinker' => 
+  array (
+    'providers' => 
+    array (
+      0 => 'Laravel\\Tinker\\TinkerServiceProvider',
+    ),
+  ),
+  'nesbot/carbon' => 
+  array (
+    'providers' => 
+    array (
+      0 => 'Carbon\\Laravel\\ServiceProvider',
+    ),
+  ),
+  'nunomaduro/collision' => 
+  array (
+    'providers' => 
+    array (
+      0 => 'NunoMaduro\\Collision\\Adapters\\Laravel\\CollisionServiceProvider',
+    ),
+  ),
+  'nunomaduro/termwind' => 
+  array (
+    'providers' => 
+    array (
+      0 => 'Termwind\\Laravel\\TermwindServiceProvider',
+    ),
+  ),
+);
+```
+
