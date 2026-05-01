@@ -10,6 +10,10 @@ CACHE_DRIVER=file
 SESSION_DRIVER=file
 QUEUE_DRIVER=sync
 
+CACHE_STORE=file
+QUEUE_CONNECTION=sync
+MAIL_MAILER=smtp
+
 MAIL_DRIVER=smtp
 MAIL_HOST=mailtrap.io
 MAIL_PORT=2525
@@ -163,11 +167,17 @@ APP_KEY=base64:vSA9s5GUIJiGPhFgb6HNl1IVM9aufynjbq5sh83EfqU=
                 <a class="nav-link {{ request()->routeIs('dashboard') ? 'active' : '' }}" href="{{ route('dashboard') }}">
                     <i class="bi bi-speedometer2 me-2"></i> Dashboard
                 </a>
+
                 <a class="nav-link {{ request()->routeIs('reservations.*') ? 'active' : '' }}" href="{{ route('reservations.index') }}">
                     <i class="bi bi-journal-text me-2"></i> Reservations
                 </a>
+
                 <a class="nav-link" href="{{ route('reservations.create') }}">
                     <i class="bi bi-plus-circle me-2"></i> New reservation
+                </a>
+
+                <a class="nav-link {{ request()->routeIs('settings.*') ? 'active' : '' }}" href="{{ route('settings.index') }}">
+                    <i class="bi bi-sliders me-2"></i> Settings
                 </a>
             </nav>
 
@@ -227,7 +237,6 @@ APP_KEY=base64:vSA9s5GUIJiGPhFgb6HNl1IVM9aufynjbq5sh83EfqU=
 @stack('scripts')
 </body>
 </html>
-
 ```
 
 ========================================
@@ -368,6 +377,7 @@ return [
 
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\ReservationController;
+use App\Http\Controllers\SettingsController;
 use Illuminate\Support\Facades\Route;
 
 Route::redirect('/', '/dashboard');
@@ -375,11 +385,15 @@ Route::redirect('/', '/dashboard');
 Route::get('/dashboard', DashboardController::class)->name('dashboard');
 
 Route::resource('reservations', ReservationController::class);
+
 Route::post('/reservations/{reservation}/confirm', [ReservationController::class, 'confirm'])
     ->name('reservations.confirm');
+
 Route::post('/reservations/{reservation}/retry-meta-event', [ReservationController::class, 'retryMetaEvent'])
     ->name('reservations.retry-meta-event');
 
+Route::resource('settings', SettingsController::class)
+    ->only(['index', 'store', 'destroy']);
 ```
 
 ========================================
@@ -433,9 +447,11 @@ class DashboardController extends Controller
 namespace App\Http\Controllers;
 
 use App\Models\Reservation;
+use App\Models\Setting;
 use App\Services\MetaConversionsApiService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
@@ -450,13 +466,15 @@ class ReservationController extends Controller
 
     public function create(): View
     {
-        return view('reservations.create', [
-            'reservation' => new Reservation([
-                'status' => Reservation::STATUS_PENDING,
-                'currency' => 'USD',
-                'purchase_value' => '0.00',
-            ]),
+        $currencies = Setting::values(Setting::KEY_CURRENCIES);
+
+        $reservation = new Reservation([
+            'status' => Reservation::STATUS_PENDING,
+            'currency' => $currencies->first() ?: 'USD',
+            'purchase_value' => '0.00',
         ]);
+
+        return view('reservations.create', $this->reservationFormData($reservation));
     }
 
     public function store(Request $request): RedirectResponse
@@ -482,12 +500,12 @@ class ReservationController extends Controller
 
     public function edit(Reservation $reservation): View
     {
-        return view('reservations.edit', compact('reservation'));
+        return view('reservations.edit', $this->reservationFormData($reservation));
     }
 
     public function update(Request $request, Reservation $reservation): RedirectResponse
     {
-        $reservation->update($this->validatedReservationData($request));
+        $reservation->update($this->validatedReservationData($request, $reservation));
 
         return redirect()
             ->route('reservations.show', $reservation)
@@ -560,8 +578,33 @@ class ReservationController extends Controller
                 : 'Meta Purchase event retry failed. Check the stored response.');
     }
 
-    private function validatedReservationData(Request $request): array
+    private function reservationFormData(Reservation $reservation): array
     {
+        return [
+            'reservation' => $reservation,
+            'restaurantNameOptions' => $this->optionsWithCurrentValue(
+                Setting::values(Setting::KEY_RESTAURANT_NAMES),
+                $reservation->restaurant_name
+            ),
+            'currencyOptions' => $this->optionsWithCurrentValue(
+                Setting::values(Setting::KEY_CURRENCIES),
+                $reservation->currency
+            ),
+        ];
+    }
+
+    private function validatedReservationData(Request $request, ?Reservation $reservation = null): array
+    {
+        $restaurantNames = $this->optionsWithCurrentValue(
+            Setting::values(Setting::KEY_RESTAURANT_NAMES),
+            $reservation?->restaurant_name
+        )->all();
+
+        $currencies = $this->optionsWithCurrentValue(
+            Setting::values(Setting::KEY_CURRENCIES),
+            $reservation?->currency
+        )->all();
+
         return $request->validate([
             'customer_name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', 'max:255'],
@@ -569,15 +612,25 @@ class ReservationController extends Controller
             'reservation_date' => ['required', 'date'],
             'reservation_time' => ['required', 'date_format:H:i'],
             'party_size' => ['required', 'integer', 'min:1'],
-            'restaurant_name' => ['required', 'string', 'max:255'],
+            'restaurant_name' => ['required', 'string', 'max:255', Rule::in($restaurantNames)],
             'status' => ['required', Rule::in(Reservation::STATUSES)],
             'purchase_value' => ['required', 'numeric', 'min:0'],
-            'currency' => ['required', 'string', 'size:3'],
+            'currency' => ['required', 'string', 'size:3', Rule::in($currencies)],
             'notes' => ['nullable', 'string'],
         ]);
     }
-}
 
+    private function optionsWithCurrentValue(Collection $options, ?string $currentValue): Collection
+    {
+        $currentValue = trim((string) $currentValue);
+
+        if ($currentValue !== '' && ! $options->contains($currentValue)) {
+            return $options->prepend($currentValue)->unique()->values();
+        }
+
+        return $options->unique()->values();
+    }
+}
 ```
 
 ========================================

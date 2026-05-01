@@ -101,11 +101,17 @@
                 <a class="nav-link {{ request()->routeIs('dashboard') ? 'active' : '' }}" href="{{ route('dashboard') }}">
                     <i class="bi bi-speedometer2 me-2"></i> Dashboard
                 </a>
+
                 <a class="nav-link {{ request()->routeIs('reservations.*') ? 'active' : '' }}" href="{{ route('reservations.index') }}">
                     <i class="bi bi-journal-text me-2"></i> Reservations
                 </a>
+
                 <a class="nav-link" href="{{ route('reservations.create') }}">
                     <i class="bi bi-plus-circle me-2"></i> New reservation
+                </a>
+
+                <a class="nav-link {{ request()->routeIs('settings.*') ? 'active' : '' }}" href="{{ route('settings.index') }}">
+                    <i class="bi bi-sliders me-2"></i> Settings
                 </a>
             </nav>
 

@@ -3,9 +3,11 @@
 namespace App\Http\Controllers;
 
 use App\Models\Reservation;
+use App\Models\Setting;
 use App\Services\MetaConversionsApiService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
@@ -20,13 +22,15 @@ class ReservationController extends Controller
 
     public function create(): View
     {
-        return view('reservations.create', [
-            'reservation' => new Reservation([
-                'status' => Reservation::STATUS_PENDING,
-                'currency' => 'USD',
-                'purchase_value' => '0.00',
-            ]),
+        $currencies = Setting::values(Setting::KEY_CURRENCIES);
+
+        $reservation = new Reservation([
+            'status' => Reservation::STATUS_PENDING,
+            'currency' => $currencies->first() ?: 'USD',
+            'purchase_value' => '0.00',
         ]);
+
+        return view('reservations.create', $this->reservationFormData($reservation));
     }
 
     public function store(Request $request): RedirectResponse
@@ -52,12 +56,12 @@ class ReservationController extends Controller
 
     public function edit(Reservation $reservation): View
     {
-        return view('reservations.edit', compact('reservation'));
+        return view('reservations.edit', $this->reservationFormData($reservation));
     }
 
     public function update(Request $request, Reservation $reservation): RedirectResponse
     {
-        $reservation->update($this->validatedReservationData($request));
+        $reservation->update($this->validatedReservationData($request, $reservation));
 
         return redirect()
             ->route('reservations.show', $reservation)
@@ -130,8 +134,33 @@ class ReservationController extends Controller
                 : 'Meta Purchase event retry failed. Check the stored response.');
     }
 
-    private function validatedReservationData(Request $request): array
+    private function reservationFormData(Reservation $reservation): array
     {
+        return [
+            'reservation' => $reservation,
+            'restaurantNameOptions' => $this->optionsWithCurrentValue(
+                Setting::values(Setting::KEY_RESTAURANT_NAMES),
+                $reservation->restaurant_name
+            ),
+            'currencyOptions' => $this->optionsWithCurrentValue(
+                Setting::values(Setting::KEY_CURRENCIES),
+                $reservation->currency
+            ),
+        ];
+    }
+
+    private function validatedReservationData(Request $request, ?Reservation $reservation = null): array
+    {
+        $restaurantNames = $this->optionsWithCurrentValue(
+            Setting::values(Setting::KEY_RESTAURANT_NAMES),
+            $reservation?->restaurant_name
+        )->all();
+
+        $currencies = $this->optionsWithCurrentValue(
+            Setting::values(Setting::KEY_CURRENCIES),
+            $reservation?->currency
+        )->all();
+
         return $request->validate([
             'customer_name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', 'max:255'],
@@ -139,11 +168,22 @@ class ReservationController extends Controller
             'reservation_date' => ['required', 'date'],
             'reservation_time' => ['required', 'date_format:H:i'],
             'party_size' => ['required', 'integer', 'min:1'],
-            'restaurant_name' => ['required', 'string', 'max:255'],
+            'restaurant_name' => ['required', 'string', 'max:255', Rule::in($restaurantNames)],
             'status' => ['required', Rule::in(Reservation::STATUSES)],
             'purchase_value' => ['required', 'numeric', 'min:0'],
-            'currency' => ['required', 'string', 'size:3'],
+            'currency' => ['required', 'string', 'size:3', Rule::in($currencies)],
             'notes' => ['nullable', 'string'],
         ]);
+    }
+
+    private function optionsWithCurrentValue(Collection $options, ?string $currentValue): Collection
+    {
+        $currentValue = trim((string) $currentValue);
+
+        if ($currentValue !== '' && ! $options->contains($currentValue)) {
+            return $options->prepend($currentValue)->unique()->values();
+        }
+
+        return $options->unique()->values();
     }
 }
