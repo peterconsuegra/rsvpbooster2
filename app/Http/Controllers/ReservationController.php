@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Reservation;
+use App\Models\Restaurant;
 use App\Models\Setting;
 use App\Services\MetaConversionsApiService;
 use Illuminate\Http\RedirectResponse;
@@ -16,7 +17,7 @@ class ReservationController extends Controller
     public function index(): View
     {
         return view('reservations.index', [
-            'reservations' => Reservation::latest()->paginate(12),
+            'reservations' => Reservation::with('restaurant')->latest()->paginate(12),
         ]);
     }
 
@@ -51,11 +52,15 @@ class ReservationController extends Controller
 
     public function show(Reservation $reservation): View
     {
+        $reservation->load('restaurant');
+
         return view('reservations.show', compact('reservation'));
     }
 
     public function edit(Reservation $reservation): View
     {
+        $reservation->load('restaurant');
+
         return view('reservations.edit', $this->reservationFormData($reservation));
     }
 
@@ -138,10 +143,7 @@ class ReservationController extends Controller
     {
         return [
             'reservation' => $reservation,
-            'restaurantNameOptions' => $this->optionsWithCurrentValue(
-                Setting::values(Setting::KEY_RESTAURANT_NAMES),
-                $reservation->restaurant_name
-            ),
+            'restaurants' => Restaurant::orderBy('name')->get(),
             'currencyOptions' => $this->optionsWithCurrentValue(
                 Setting::values(Setting::KEY_CURRENCIES),
                 $reservation->currency
@@ -151,29 +153,30 @@ class ReservationController extends Controller
 
     private function validatedReservationData(Request $request, ?Reservation $reservation = null): array
     {
-        $restaurantNames = $this->optionsWithCurrentValue(
-            Setting::values(Setting::KEY_RESTAURANT_NAMES),
-            $reservation?->restaurant_name
-        )->all();
-
         $currencies = $this->optionsWithCurrentValue(
             Setting::values(Setting::KEY_CURRENCIES),
             $reservation?->currency
         )->all();
 
-        return $request->validate([
+        $data = $request->validate([
+            'restaurant_id' => ['required', 'integer', Rule::exists('restaurants', 'id')],
             'customer_name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', 'max:255'],
             'phone' => ['nullable', 'string', 'max:50'],
             'reservation_date' => ['required', 'date'],
             'reservation_time' => ['required', 'date_format:H:i'],
             'party_size' => ['required', 'integer', 'min:1'],
-            'restaurant_name' => ['required', 'string', 'max:255', Rule::in($restaurantNames)],
             'status' => ['required', Rule::in(Reservation::STATUSES)],
             'purchase_value' => ['required', 'numeric', 'min:0'],
             'currency' => ['required', 'string', 'size:3', Rule::in($currencies)],
             'notes' => ['nullable', 'string'],
         ]);
+
+        $restaurant = Restaurant::findOrFail($data['restaurant_id']);
+
+        $data['restaurant_name'] = $restaurant->name;
+
+        return $data;
     }
 
     private function optionsWithCurrentValue(Collection $options, ?string $currentValue): Collection

@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Reservation extends Model
 {
@@ -20,6 +21,7 @@ class Reservation extends Model
     ];
 
     protected $fillable = [
+        'restaurant_id',
         'customer_name',
         'email',
         'phone',
@@ -41,15 +43,28 @@ class Reservation extends Model
     ];
 
     protected $casts = [
+        'restaurant_id' => 'integer',
         'reservation_date' => 'date',
         'meta_response' => 'array',
         'meta_event_sent_at' => 'datetime',
         'purchase_value' => 'decimal:2',
     ];
 
+    public function restaurant(): BelongsTo
+    {
+        return $this->belongsTo(Restaurant::class);
+    }
+
     public function setCurrencyAttribute(?string $value): void
     {
         $this->attributes['currency'] = strtoupper(trim($value ?: 'USD'));
+    }
+
+    public function restaurantLabel(): string
+    {
+        return $this->restaurant?->name
+            ?: $this->restaurant_name
+            ?: 'Restaurant deleted';
     }
 
     public function isConfirmed(): bool

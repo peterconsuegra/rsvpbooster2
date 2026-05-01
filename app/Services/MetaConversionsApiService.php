@@ -14,6 +14,14 @@ class MetaConversionsApiService
     /**
      * Send a Meta Conversions API Purchase event for a confirmed reservation.
      *
+     * Restaurant-level credentials are used first:
+     * - restaurants.meta_pixel_id
+     * - restaurants.meta_access_token
+     *
+     * If those values are empty, the service falls back to:
+     * - services.meta.pixel_id
+     * - services.meta.access_token
+     *
      * Customer fields hashed before sending:
      * - email is trimmed, lowercased, and SHA-256 hashed
      * - phone is reduced to digits and SHA-256 hashed
@@ -23,12 +31,6 @@ class MetaConversionsApiService
      * - client_user_agent
      * - fbp
      * - fbc
-     *
-     * The event is POSTed to:
-     * https://graph.facebook.com/{META_GRAPH_API_VERSION}/{META_PIXEL_ID}/events
-     *
-     * To test in Meta Events Manager, set META_TEST_EVENT_CODE in .env.
-     * This service includes test_event_code only when that value exists.
      */
     public function sendPurchase(Reservation $reservation, Request $request): bool
     {
@@ -41,19 +43,21 @@ class MetaConversionsApiService
             return true;
         }
 
+        $reservation->loadMissing('restaurant');
+
         $eventId = $reservation->meta_event_id ?: $this->generateEventId($reservation);
 
         if (! $reservation->meta_event_id) {
             $reservation->forceFill(['meta_event_id' => $eventId])->save();
         }
 
-        $pixelId = config('services.meta.pixel_id');
-        $accessToken = config('services.meta.access_token');
+        $pixelId = $reservation->restaurant?->meta_pixel_id ?: config('services.meta.pixel_id');
+        $accessToken = $reservation->restaurant?->meta_access_token ?: config('services.meta.access_token');
         $graphApiVersion = config('services.meta.graph_api_version');
         $testEventCode = config('services.meta.test_event_code');
 
         if (! $pixelId || ! $accessToken || ! $graphApiVersion || $graphApiVersion === 'vXX.X') {
-            return $this->storeFailure($reservation, 'Meta CAPI is missing a valid META_PIXEL_ID, META_ACCESS_TOKEN, or META_GRAPH_API_VERSION.');
+            return $this->storeFailure($reservation, 'Meta CAPI is missing a valid Pixel ID, access token, or graph API version.');
         }
 
         $payload = $this->buildPayload($reservation, $request, $eventId);

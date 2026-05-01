@@ -79,7 +79,7 @@
                             <div class="fw-semibold">{{ $reservation->customer_name }}</div>
                             <div class="small text-muted">{{ $reservation->email }}</div>
                         </td>
-                        <td>{{ $reservation->restaurant_name }}</td>
+                        <td>{{ $reservation->restaurantLabel() }}</td>
                         <td>
                             {{ $reservation->reservation_date?->format('M j, Y') }}
                             <div class="small text-muted">{{ $reservation->formattedReservationTime() }}</div>

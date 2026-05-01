@@ -110,6 +110,10 @@
                     <i class="bi bi-plus-circle me-2"></i> New reservation
                 </a>
 
+                <a class="nav-link {{ request()->routeIs('restaurants.*') ? 'active' : '' }}" href="{{ route('restaurants.index') }}">
+                    <i class="bi bi-shop me-2"></i> Restaurants
+                </a>
+
                 <a class="nav-link {{ request()->routeIs('settings.*') ? 'active' : '' }}" href="{{ route('settings.index') }}">
                     <i class="bi bi-sliders me-2"></i> Settings
                 </a>

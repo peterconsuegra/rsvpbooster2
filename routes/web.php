@@ -2,12 +2,15 @@
 
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\ReservationController;
+use App\Http\Controllers\RestaurantController;
 use App\Http\Controllers\SettingsController;
 use Illuminate\Support\Facades\Route;
 
 Route::redirect('/', '/dashboard');
 
 Route::get('/dashboard', DashboardController::class)->name('dashboard');
+
+Route::resource('restaurants', RestaurantController::class);
 
 Route::resource('reservations', ReservationController::class);
 

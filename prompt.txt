@@ -176,6 +176,10 @@ APP_KEY=base64:vSA9s5GUIJiGPhFgb6HNl1IVM9aufynjbq5sh83EfqU=
                     <i class="bi bi-plus-circle me-2"></i> New reservation
                 </a>
 
+                <a class="nav-link {{ request()->routeIs('restaurants.*') ? 'active' : '' }}" href="{{ route('restaurants.index') }}">
+                    <i class="bi bi-shop me-2"></i> Restaurants
+                </a>
+
                 <a class="nav-link {{ request()->routeIs('settings.*') ? 'active' : '' }}" href="{{ route('settings.index') }}">
                     <i class="bi bi-sliders me-2"></i> Settings
                 </a>
@@ -344,7 +348,7 @@ return [
                             <div class="fw-semibold">{{ $reservation->customer_name }}</div>
                             <div class="small text-muted">{{ $reservation->email }}</div>
                         </td>
-                        <td>{{ $reservation->restaurant_name }}</td>
+                        <td>{{ $reservation->restaurantLabel() }}</td>
                         <td>
                             {{ $reservation->reservation_date?->format('M j, Y') }}
                             <div class="small text-muted">{{ $reservation->formattedReservationTime() }}</div>
@@ -366,7 +370,6 @@ return [
         </div>
     </div>
 @endsection
-
 ```
 
 ========================================
@@ -377,12 +380,15 @@ return [
 
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\ReservationController;
+use App\Http\Controllers\RestaurantController;
 use App\Http\Controllers\SettingsController;
 use Illuminate\Support\Facades\Route;
 
 Route::redirect('/', '/dashboard');
 
 Route::get('/dashboard', DashboardController::class)->name('dashboard');
+
+Route::resource('restaurants', RestaurantController::class);
 
 Route::resource('reservations', ReservationController::class);
 
@@ -431,11 +437,10 @@ class DashboardController extends Controller
             'confirmedReservations' => Reservation::where('status', Reservation::STATUS_CONFIRMED)->count(),
             'pendingReservations' => Reservation::where('status', Reservation::STATUS_PENDING)->count(),
             'trackedPurchaseValue' => Reservation::whereNotNull('meta_event_sent_at')->sum('purchase_value'),
-            'recentReservations' => Reservation::latest()->take(8)->get(),
+            'recentReservations' => Reservation::with('restaurant')->latest()->take(8)->get(),
         ]);
     }
 }
-
 ```
 
 ========================================
@@ -447,6 +452,7 @@ class DashboardController extends Controller
 namespace App\Http\Controllers;
 
 use App\Models\Reservation;
+use App\Models\Restaurant;
 use App\Models\Setting;
 use App\Services\MetaConversionsApiService;
 use Illuminate\Http\RedirectResponse;
@@ -460,7 +466,7 @@ class ReservationController extends Controller
     public function index(): View
     {
         return view('reservations.index', [
-            'reservations' => Reservation::latest()->paginate(12),
+            'reservations' => Reservation::with('restaurant')->latest()->paginate(12),
         ]);
     }
 
@@ -495,11 +501,15 @@ class ReservationController extends Controller
 
     public function show(Reservation $reservation): View
     {
+        $reservation->load('restaurant');
+
         return view('reservations.show', compact('reservation'));
     }
 
     public function edit(Reservation $reservation): View
     {
+        $reservation->load('restaurant');
+
         return view('reservations.edit', $this->reservationFormData($reservation));
     }
 
@@ -582,10 +592,7 @@ class ReservationController extends Controller
     {
         return [
             'reservation' => $reservation,
-            'restaurantNameOptions' => $this->optionsWithCurrentValue(
-                Setting::values(Setting::KEY_RESTAURANT_NAMES),
-                $reservation->restaurant_name
-            ),
+            'restaurants' => Restaurant::orderBy('name')->get(),
             'currencyOptions' => $this->optionsWithCurrentValue(
                 Setting::values(Setting::KEY_CURRENCIES),
                 $reservation->currency
@@ -595,29 +602,30 @@ class ReservationController extends Controller
 
     private function validatedReservationData(Request $request, ?Reservation $reservation = null): array
     {
-        $restaurantNames = $this->optionsWithCurrentValue(
-            Setting::values(Setting::KEY_RESTAURANT_NAMES),
-            $reservation?->restaurant_name
-        )->all();
-
         $currencies = $this->optionsWithCurrentValue(
             Setting::values(Setting::KEY_CURRENCIES),
             $reservation?->currency
         )->all();
 
-        return $request->validate([
+        $data = $request->validate([
+            'restaurant_id' => ['required', 'integer', Rule::exists('restaurants', 'id')],
             'customer_name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', 'max:255'],
             'phone' => ['nullable', 'string', 'max:50'],
             'reservation_date' => ['required', 'date'],
             'reservation_time' => ['required', 'date_format:H:i'],
             'party_size' => ['required', 'integer', 'min:1'],
-            'restaurant_name' => ['required', 'string', 'max:255', Rule::in($restaurantNames)],
             'status' => ['required', Rule::in(Reservation::STATUSES)],
             'purchase_value' => ['required', 'numeric', 'min:0'],
             'currency' => ['required', 'string', 'size:3', Rule::in($currencies)],
             'notes' => ['nullable', 'string'],
         ]);
+
+        $restaurant = Restaurant::findOrFail($data['restaurant_id']);
+
+        $data['restaurant_name'] = $restaurant->name;
+
+        return $data;
     }
 
     private function optionsWithCurrentValue(Collection $options, ?string $currentValue): Collection
@@ -643,6 +651,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Reservation extends Model
 {
@@ -659,6 +668,7 @@ class Reservation extends Model
     ];
 
     protected $fillable = [
+        'restaurant_id',
         'customer_name',
         'email',
         'phone',
@@ -680,15 +690,28 @@ class Reservation extends Model
     ];
 
     protected $casts = [
+        'restaurant_id' => 'integer',
         'reservation_date' => 'date',
         'meta_response' => 'array',
         'meta_event_sent_at' => 'datetime',
         'purchase_value' => 'decimal:2',
     ];
 
+    public function restaurant(): BelongsTo
+    {
+        return $this->belongsTo(Restaurant::class);
+    }
+
     public function setCurrencyAttribute(?string $value): void
     {
         $this->attributes['currency'] = strtoupper(trim($value ?: 'USD'));
+    }
+
+    public function restaurantLabel(): string
+    {
+        return $this->restaurant?->name
+            ?: $this->restaurant_name
+            ?: 'Restaurant deleted';
     }
 
     public function isConfirmed(): bool
@@ -750,7 +773,6 @@ class Reservation extends Model
         return substr((string) $this->reservation_time, 0, 5);
     }
 }
-
 ```
 
 ========================================
@@ -836,6 +858,14 @@ class MetaConversionsApiService
     /**
      * Send a Meta Conversions API Purchase event for a confirmed reservation.
      *
+     * Restaurant-level credentials are used first:
+     * - restaurants.meta_pixel_id
+     * - restaurants.meta_access_token
+     *
+     * If those values are empty, the service falls back to:
+     * - services.meta.pixel_id
+     * - services.meta.access_token
+     *
      * Customer fields hashed before sending:
      * - email is trimmed, lowercased, and SHA-256 hashed
      * - phone is reduced to digits and SHA-256 hashed
@@ -845,12 +875,6 @@ class MetaConversionsApiService
      * - client_user_agent
      * - fbp
      * - fbc
-     *
-     * The event is POSTed to:
-     * https://graph.facebook.com/{META_GRAPH_API_VERSION}/{META_PIXEL_ID}/events
-     *
-     * To test in Meta Events Manager, set META_TEST_EVENT_CODE in .env.
-     * This service includes test_event_code only when that value exists.
      */
     public function sendPurchase(Reservation $reservation, Request $request): bool
     {
@@ -863,19 +887,21 @@ class MetaConversionsApiService
             return true;
         }
 
+        $reservation->loadMissing('restaurant');
+
         $eventId = $reservation->meta_event_id ?: $this->generateEventId($reservation);
 
         if (! $reservation->meta_event_id) {
             $reservation->forceFill(['meta_event_id' => $eventId])->save();
         }
 
-        $pixelId = config('services.meta.pixel_id');
-        $accessToken = config('services.meta.access_token');
+        $pixelId = $reservation->restaurant?->meta_pixel_id ?: config('services.meta.pixel_id');
+        $accessToken = $reservation->restaurant?->meta_access_token ?: config('services.meta.access_token');
         $graphApiVersion = config('services.meta.graph_api_version');
         $testEventCode = config('services.meta.test_event_code');
 
         if (! $pixelId || ! $accessToken || ! $graphApiVersion || $graphApiVersion === 'vXX.X') {
-            return $this->storeFailure($reservation, 'Meta CAPI is missing a valid META_PIXEL_ID, META_ACCESS_TOKEN, or META_GRAPH_API_VERSION.');
+            return $this->storeFailure($reservation, 'Meta CAPI is missing a valid Pixel ID, access token, or graph API version.');
         }
 
         $payload = $this->buildPayload($reservation, $request, $eventId);
@@ -1007,7 +1033,6 @@ class MetaConversionsApiService
         return false;
     }
 }
-
 ```
 
 ========================================
